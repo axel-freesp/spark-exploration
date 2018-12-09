@@ -27,7 +27,8 @@ package Trees is
 
    procedure Initialize (Tree: out Tree_Type)
      with
-       Post => (Is_Consistent(Tree) and
+       Post => (Is_Consistent(Tree) and then
+                Tree_Is_Ordered (Tree) and then
                 Is_Empty (Tree));
 
    procedure Insert (Tree:  in out Tree_Type;
@@ -35,13 +36,46 @@ package Trees is
                      Value: in     Value_Type;
                      Status:   out Tree_Status_Type)
      with
-       Pre  => (Is_Consistent(Tree) and
-                ((Key /= Sentinel_Key) and then not Is_KeyStored(Tree, Key))),
-       Post => (Is_Consistent(Tree) and
-                Is_Preserving (Tree, Tree'Old) and
+       Pre  => (Is_Consistent(Tree) and then
+                Tree_Is_Ordered (Tree) and then
+                Key /= Sentinel_Key and then
+                not Is_KeyStored(Tree, Key)),
+       Post => (Is_Consistent(Tree) and then
+                Tree_Is_Ordered (Tree) and then
+                Is_Preserving (Tree, Tree'Old) and then
                 (if Status = Ok then Is_Stored(Tree, Key, Value)));
 
+   function In_Order_First (Tree: in Tree_Type) return Key_Type
+     with
+       Pre => (Is_Consistent(Tree) and then
+               Tree_Is_Ordered (Tree)),
+       Post => (if In_Order_First'Result /= Sentinel_Key then
+                  (Is_KeyStored(Tree, In_Order_First'Result)
+                   and Is_SmallestKey(Tree, In_Order_First'Result)));
+
+   function In_Order_Next  (Tree: in Tree_Type;
+                            Key:  in Key_Type) return Key_Type
+     with
+       Pre => (Is_Consistent(Tree) and then
+               Tree_Is_Ordered (Tree) and then
+               Key /= Sentinel_Key and then
+               Is_KeyStored(Tree, Key)),
+       Post => (if In_Order_Next'Result /= Sentinel_Key then
+                  (Is_KeyStored(Tree, In_Order_Next'Result) and Key < In_Order_Next'Result));
+
+   function Find_Key       (Tree: in Tree_Type;
+                            Key:  in Key_Type) return Boolean
+     with
+       Pre => (Is_Consistent(Tree) and Key /= Sentinel_Key);
+
+   function Find_Value     (Tree: in Tree_Type;
+                            Key:  in Key_Type) return Value_Type
+     with
+       Pre => ((Is_Consistent(Tree) and Key /= Sentinel_Key) and then Is_KeyStored(Tree, Key));
+
+
    -- Ghost functions:
+
    function Is_Empty       (Tree: in Tree_Type) return Boolean
      with
        inline,
@@ -71,6 +105,18 @@ package Trees is
      with
        inline,
        Ghost => True;
+
+   function Is_SmallestKey (Tree: in Tree_Type;
+                            Key:  in Key_Type) return Boolean
+     with
+       inline,
+       Ghost => True;
+
+   function Tree_Is_Ordered (Tree: Tree_Type) return Boolean
+       with
+         inline,
+         Ghost => True,
+         Pre => (Is_Consistent (Tree));
 
 private ---------------------------------------------------------
 
@@ -118,6 +164,15 @@ private ---------------------------------------------------------
         (Tree.Nodes(i).Key = Key and
          Tree.Nodes(i).Value = Value));
 
+   function Is_UsedNode (Tree: in Tree_Type;
+                         Node: in Index_Type) return Boolean
+       with inline, Ghost => True;
+
+   function Is_SmallestKey (Tree: in Tree_Type;
+                            Key:  in Key_Type) return Boolean is
+      (for all i in Index_Type'Range =>
+         (if Is_UsedNode(Tree, i) then not (Tree.Nodes(i).Key < Key)));
+
 
 
 
@@ -127,8 +182,7 @@ private ---------------------------------------------------------
 
    function Is_UsedNode (Tree: in Tree_Type;
                          Node: in Index_Type) return Boolean is
-     (Tree.Nodes(Node).Key /= Sentinel_Key)
-       with inline, Ghost => True;
+     (Tree.Nodes(Node).Key /= Sentinel_Key);
 
    function Is_FreeNode (Tree: in Tree_Type;
                          Node: in Index_Type) return Boolean is
@@ -270,5 +324,80 @@ private ---------------------------------------------------------
                (if Is_UsedNode(Old_Tree, i) then
                   (Is_Stored (Tree, Old_Tree.Nodes(i).Key, Old_Tree.Nodes(i).Value)))));
 
+
+   ----------------------------------------------------------------------------
+   -- Binary Tree Consistency
+   ----------------------------------------------------------------------------
+   function Is_Ancestor_Of (Tree:     in Tree_Type;
+                            Node:     in Index_Type;
+                            Ancestor: in Index_Type) return Boolean
+     with
+       Ghost => True,
+       Pre => (Is_Consistent (Tree) and
+               Is_UsedNode (Tree, Node) and
+               Is_UsedNode (Tree, Ancestor));
+
+   function All_Used_Nodes_Are_In_Tree (Tree: in Tree_Type) return Boolean is
+     (for all i in Index_Type'Range =>
+        (if Is_UsedNode (Tree, i) then
+              Is_Ancestor_Of (Tree, i, Tree.Root_Node)))
+       with
+         inline,
+         Ghost => True,
+         Pre => (Is_Consistent (Tree));
+
+   function In_Left_Subtree (Tree: Tree_Type;
+                             Node, Subnode: Index_Type) return Boolean is
+     (if Tree.Nodes(Node).Left = 0 then False
+              else
+         Is_Ancestor_Of (Tree, Subnode, Tree.Nodes(Node).Left))
+       with
+         inline,
+         Ghost => True,
+         Pre => (Is_Consistent (Tree) and
+                 Is_UsedNode (Tree, Node) and
+                 Is_UsedNode (Tree, Subnode));
+
+   function In_Right_Subtree (Tree: Tree_Type;
+                              Node, Subnode: Index_Type) return Boolean is
+     (if Tree.Nodes(Node).Right = 0 then False
+              else
+         Is_Ancestor_Of (Tree, Subnode, Tree.Nodes(Node).Right))
+       with
+         inline,
+         Ghost => True,
+         Pre => (Is_Consistent (Tree) and
+                 Is_UsedNode (Tree, Node) and
+                 Is_UsedNode (Tree, Subnode));
+
+   function All_Keys_In_Left_Subtree_Are_Less (Tree: in Tree_Type;
+                                               Node: in Index_Type) return Boolean is
+     (for all i in Index_Type'Range =>
+        (if Is_UsedNode (Tree, i) then
+             (if In_Left_Subtree (Tree, Node, i) then
+                     Tree.Nodes(i).Key < Tree.Nodes(Node).Key)))
+       with
+         inline,
+         Ghost => True,
+         Pre => (Is_Consistent (Tree) and
+                           Is_UsedNode (Tree, Node));
+
+   function All_Keys_In_Right_Subtree_Are_Greater (Tree: in Tree_Type;
+                                                   Node: in Index_Type) return Boolean is
+     (for all i in Index_Type'Range =>
+        (if Is_UsedNode (Tree, i) then
+             (if In_Right_Subtree (Tree, Node, i) then
+                     Tree.Nodes(Node).Key < Tree.Nodes(i).Key)))
+       with
+         inline,
+         Ghost => True,
+         Pre => (Is_Consistent (Tree) and
+                           Is_UsedNode (Tree, Node));
+
+   function Tree_Is_Ordered (Tree: Tree_Type) return Boolean is
+     (for all i in Index_Type'Range =>
+        (if Is_UsedNode (Tree, i) then
+              All_Keys_In_Left_Subtree_Are_Less (Tree, i) and
+             All_Keys_In_Right_Subtree_Are_Greater (Tree, i)));
 
 end Trees;

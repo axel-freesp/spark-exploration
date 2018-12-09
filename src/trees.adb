@@ -2,6 +2,30 @@ pragma SPARK_Mode(On);
 --with Ada.Text_IO; use Ada.Text_IO;
 
 package body Trees is
+
+   function Is_Ancestor_Of (Tree:     in Tree_Type;
+                            Node:     in Index_Type;
+                            Ancestor: in Index_Type) return Boolean
+   is
+      N: Pointer_Type := Node;
+   begin
+      pragma Assert (N /= 0);
+      while N /= Tree.Root_Node loop
+         pragma Loop_Invariant (N /= Tree.Root_Node);
+         pragma Loop_Invariant (Is_Consistent (Tree));
+         pragma Loop_Invariant (N /= 0);
+         pragma Loop_Invariant (Is_UsedNode (Tree, N));
+         if Tree.Nodes(N).Parent = Ancestor then
+            return True;
+         end if;
+         pragma Assert (N /= Tree.Root_Node);
+         pragma Assert (Tree.Nodes(N).Parent /= 0);
+         pragma Assert (Is_UsedNode (Tree, N));
+         N := Tree.Nodes(N).Parent;
+      end loop;
+      return False;
+   end Is_Ancestor_Of;
+
    ----------------------------------------------------------------------------
    -- Initialize
    ----------------------------------------------------------------------------
@@ -97,6 +121,7 @@ package body Trees is
          Used_Nodes_Except_Do_Not_Self_Reference (Tree, Node) and
          Referenced_Nodes_Except_Are_Used (Tree, Node) and
          (if Tree.Root_Node /= 0 then not Is_FreeNode (Tree, Tree.Root_Node)) and
+         not Is_Empty (Tree) and
          (for all i in Index_Type'Range =>
               (if Is_UsedNode (Tree, i) and i /= Node then
                       Is_UsedNodeConsistent (Tree, i))))
@@ -104,18 +129,67 @@ package body Trees is
             inline,
             Ghost => True;
 
+      function Is_Ancestor_Of_Internal (Tree:     in Tree_Type;
+                                        Node:     in Index_Type;
+                                        Ancestor: in Index_Type;
+                                        Excl:     in Index_Type) return Boolean
+        with
+          Ghost => True,
+          Pre => (Is_Consistent_Except (Tree, Excl) and
+                  Is_UsedNode (Tree, Node) and
+                  Is_UsedNode (Tree, Ancestor) and
+                  Excl /= Node and
+                  Excl /= Ancestor)
+      is
+         N: Pointer_Type := Node;
+      begin
+         pragma Assert (N /= 0);
+         while N /= Tree.Root_Node loop
+            pragma Loop_Invariant (N /= Tree.Root_Node);
+            pragma Loop_Invariant (Is_Consistent_Except (Tree, Excl));
+            pragma Loop_Invariant (N /= 0);
+            pragma Loop_Invariant (N /= Excl);
+            pragma Loop_Invariant (Is_UsedNode (Tree, N));
+            if Tree.Nodes(N).Parent = Ancestor then
+               return True;
+            end if;
+            if Tree.Nodes(N).Parent = Excl then
+               return False;
+            end if;
+            pragma Assert (N /= Tree.Root_Node);
+            pragma Assert (Tree.Nodes(N).Parent /= 0);
+            pragma Assert (Tree.Nodes(N).Parent /= Excl);
+            pragma Assert (Is_UsedNode (Tree, N));
+            N := Tree.Nodes(N).Parent;
+         end loop;
+      return False;
+   end Is_Ancestor_Of_Internal;
+
+   function All_Used_Nodes_Except_Are_In_Tree (Tree: in Tree_Type;
+                                               Node: in Index_Type) return Boolean is
+        (if Tree.Root_Node /= 0 then
+            (for all i in Index_Type'Range =>
+                 (if Is_UsedNode (Tree, i) and i /= Node then
+                         Is_Ancestor_Of_Internal (Tree, i, Tree.Root_Node, Node))))
+       with
+         inline,
+         Ghost => True,
+         Pre => (Is_Consistent_Except(Tree, Node));
+
    procedure Insert_Node (Tree: in out Tree_Type;
                           Node: in     Index_Type)
         with
-          Pre => (Is_Consistent_Except(Tree, Node) and
-                  Tree.Root_Node /= 0 and
-                  Is_UsedNode (Tree, Node) and
+          Pre => (Is_Consistent_Except(Tree, Node) and then
+                  All_Used_Nodes_Except_Are_In_Tree (Tree, Node) and then
+                  Tree.Root_Node /= 0 and then
+                  Is_UsedNode (Tree, Node) and then
                   Node_Is_Isolated (Tree, Node)),
-          Post => (Is_Consistent(Tree) and
-                   Is_Preserving (Tree, Tree'Old) and
-                   Is_Stored(Tree, Tree.Nodes(Node).Key, Tree.Nodes(Node).Value) and
-                   Tree.Nodes(Node).Key = Tree'Old.Nodes(Node).Key and
-                   Tree.Nodes(Node).Value = Tree'Old.Nodes(Node).Value)
+          Post => (Is_Consistent(Tree) and then
+                   Is_Preserving (Tree, Tree'Old) and then
+                   Is_Stored(Tree, Tree.Nodes(Node).Key, Tree.Nodes(Node).Value) and then
+                   Tree.Nodes(Node).Key = Tree'Old.Nodes(Node).Key and then
+                   Tree.Nodes(Node).Value = Tree'Old.Nodes(Node).Value and then
+                   All_Used_Nodes_Are_In_Tree (Tree))
         is
          Parent: Pointer_Type := Tree.Root_Node;
          Old_Tree: Tree_Type := Tree with Ghost => True;
@@ -144,6 +218,8 @@ package body Trees is
             pragma Loop_Invariant (for all i in Index_Type'Range =>
                                      (if Is_UsedNode (Tree, i) and i /= Node then
                                            Is_UsedNodeConsistent (Tree, i)));
+            pragma Loop_Invariant (Is_Consistent_Except (Tree, Node));
+            pragma Loop_Invariant (All_Used_Nodes_Except_Are_In_Tree (Tree, Node));
 
             if Tree.Nodes(Node).Key < Tree.Nodes(Parent).Key then
                if Tree.Nodes(Parent).Left = 0 then
@@ -158,6 +234,7 @@ package body Trees is
                                  Is_UsedNode (Tree, Parent));
                   pragma Assert (Each_Used_Node_Except_Has_Parent (Tree, Node));
                   pragma Assert (Each_Used_Node_Is_Referenced_At_Most_Once (Tree));
+                  pragma Assert (All_Used_Nodes_Except_Are_In_Tree (Tree, Node));
 
                   Tree.Nodes(Parent).Left := Node;
                   Tree.Nodes(Node).Parent := Parent;
@@ -203,6 +280,10 @@ package body Trees is
                                               Is_UsedNodeConsistent (Tree, i)));
                   pragma Assert (Is_Consistent (Tree));
                   pragma Assert (Is_Preserving (Tree, Old_Tree));
+                  pragma Assert (Is_Consistent_Except (Tree, Node));
+                  pragma Assert (All_Used_Nodes_Except_Are_In_Tree (Tree, Node));
+                  pragma Assert (Is_Ancestor_Of (Tree, Node, Tree.Root_Node));
+                  pragma Assert (All_Used_Nodes_Are_In_Tree (Tree));
                   exit;
                else
                   pragma Assert (Tree.Nodes(Parent).Left /= 0);
@@ -225,6 +306,7 @@ package body Trees is
                                  Is_UsedNode (Tree, Parent));
                   pragma Assert (Each_Used_Node_Except_Has_Parent (Tree, Node));
                   pragma Assert (Each_Used_Node_Is_Referenced_At_Most_Once (Tree));
+                  pragma Assert (All_Used_Nodes_Except_Are_In_Tree (Tree, Node));
 
                   Tree.Nodes(Parent).Right := Node;
                   Tree.Nodes(Node).Parent := Parent;
@@ -270,6 +352,9 @@ package body Trees is
                                               Is_UsedNodeConsistent (Tree, i)));
                   pragma Assert (Is_Consistent (Tree));
                   pragma Assert (Is_Preserving (Tree, Old_Tree));
+                  pragma Assert (All_Used_Nodes_Except_Are_In_Tree (Tree, Node));
+                  pragma Assert (Is_Ancestor_Of (Tree, Node, Tree.Root_Node));
+                  pragma Assert (All_Used_Nodes_Are_In_Tree (Tree));
                   exit;
                else
                   pragma Assert (Tree.Nodes(Parent).Right /= 0);
@@ -376,9 +461,11 @@ package body Trees is
       pragma Assert (not Is_KeyStored(Tree, Key));
       if Is_Empty(Tree.Free_List) then
          pragma Assert (Is_Consistent(Tree));
+         pragma Assert (Tree_Is_Ordered (Tree));
          Status := OutOfMemory;
       else
          pragma Assert (Is_Consistent(Tree));
+         pragma Assert (Tree_Is_Ordered (Tree));
 
          Allocate_Node (Tree, Node, Key, Value);
 
@@ -404,6 +491,7 @@ package body Trees is
                                   Tree.Nodes(i).Parent /= Node));
             -- consistency
             pragma Assert (Is_Consistent (Tree.Free_List));
+            pragma Assert (Tree_Is_Ordered (Tree));
             pragma Assert (Each_Key_Is_Unique (Tree));
             pragma Assert (Is_Ordered (Tree));
             pragma Assert (Used_Nodes_Cannot_Be_Allocated (Tree));
@@ -426,6 +514,7 @@ package body Trees is
          end if;
 
          pragma Assert (Is_Consistent(Tree));
+         pragma Assert (Tree_Is_Ordered (Tree));
          pragma Assert (Is_KeyStored(Tree, Key));
          pragma Assert (Is_Preserving (Tree, Old_Tree));
          Status := Ok;
@@ -434,5 +523,191 @@ package body Trees is
 
    end Insert;
 
+
+   ----------------------------------------------------------------------------
+   function In_Order_FirstNode (Tree: in Tree_Type) return Pointer_Type
+     with
+       Pre => (Is_Consistent(Tree)),
+       Post => (if In_Order_FirstNode'Result /= 0 then
+                  (Is_KeyStored(Tree, Tree.Nodes(In_Order_FirstNode'Result).Key)
+                   and Is_SmallestKey(Tree, Tree.Nodes(In_Order_FirstNode'Result).Key)))
+     is
+      Node: Pointer_Type := Tree.Root_Node;
+   begin
+      if Node /= 0 then
+         while Tree.Nodes(Node).Left /= 0 loop
+            pragma Loop_Invariant (Node /= 0);
+            pragma Loop_Invariant (Tree.Nodes(Node).Left /= 0);
+            pragma Loop_Invariant (Is_Consistent(Tree));
+            pragma Loop_Invariant (Is_UsedNode(Tree, Node));
+            pragma Loop_Invariant (Tree.Nodes(Tree.Nodes(Node).Left).Key < Tree.Nodes(Node).Key);
+            pragma Loop_Invariant (if (for some i in Index_Type'Range =>
+                                         (Tree.Nodes(i).Key < Tree.Nodes(Node).Key)) then
+                                        Tree.Nodes(Node).Left /= 0);
+            pragma Loop_Invariant (if Tree.Nodes(Node).Left /= 0 then
+                                     (for some i in Index_Type'Range =>
+                                         (Tree.Nodes(i).Key < Tree.Nodes(Node).Key)));
+            pragma Loop_Invariant ((Tree.Nodes(Node).Left /= 0) =
+                                     (for some i in Index_Type'Range =>
+                                         (Tree.Nodes(i).Key < Tree.Nodes(Node).Key)));
+
+            Node := Tree.Nodes(Node).Left;
+
+            pragma Assert (Node /= 0);
+            pragma Assert (Is_Consistent(Tree));
+            pragma Assert (Is_UsedNode(Tree, Node));
+            pragma Assert ((Tree.Nodes(Node).Left /= 0) =
+                           (for some i in Index_Type'Range =>
+                              (Tree.Nodes(i).Key < Tree.Nodes(Node).Key)));
+         end loop;
+         pragma Assert (Node /= 0);
+         pragma Assert (Tree.Nodes(Node).Left = 0);
+         pragma Assert (Is_Consistent(Tree));
+         pragma Assert (Is_UsedNode(Tree, Node));
+         pragma Assert (if (for some i in Index_Type'Range =>
+                              (Tree.Nodes(i).Key < Tree.Nodes(Node).Key)) then
+                             Tree.Nodes(Node).Left /= 0);
+         pragma Assert ((Tree.Nodes(Node).Left /= 0) =
+                        (for some i in Index_Type'Range =>
+                           (Tree.Nodes(i).Key < Tree.Nodes(Node).Key)));
+         pragma Assert (not (for some i in Index_Type'Range =>
+                               (Tree.Nodes(i).Key < Tree.Nodes(Node).Key)));
+         pragma Assert (Is_SmallestKey(Tree, Node));
+      end if;
+      return Node;
+   end In_Order_FirstNode;
+
+   ----------------------------------------------------------------------------
+   function In_Order_First (Tree: in Tree_Type) return Key_Type is
+      Node: Pointer_Type;
+   begin
+      Node  := In_Order_FirstNode(Tree);
+      if Node = 0 then
+         return Sentinel_Key;
+      else
+         return Tree.Nodes(Node).Key;
+      end if;
+   end In_Order_First;
+
+   ----------------------------------------------------------------------------
+   function Find_Node      (Tree: in Tree_Type;
+                            Key:  in Key_Type) return Pointer_Type
+     with
+       Pre => (Is_Consistent(Tree) and Key /= Sentinel_Key),
+       Post => ((if Find_Node'Result /= 0 then
+                      Tree.Nodes(Find_Node'Result).Key = Key) and
+                (if Find_Node'Result = 0 then
+                     (not (for some i in Index_Type'Range =>
+                               (Is_UsedNode(Tree, i) and
+                                Tree.Nodes(i).Key = Key)))))
+     is
+      Node: Pointer_Type := Tree.Root_Node;
+   begin
+      while Node /= 0 loop
+         pragma Assert (Is_Consistent(Tree) and Key /= Sentinel_Key);
+         pragma Assert (Node /= 0);
+         if Key < Tree.Nodes(Node).Key then
+            pragma Assert (Key < Tree.Nodes(Node).Key);
+            pragma Assert (if Tree.Nodes(Node).Left /= 0 then
+                             (not (for some i in Index_Type'Range =>
+                                       (Is_UsedNode(Tree, i) and
+                                              Tree.Nodes(i).Key = Key))));
+            Node := Tree.Nodes(Node).Left;
+         elsif Tree.Nodes(Node).Key = Key then
+            pragma Assert (Node /= 0);
+            pragma Assert (Tree.Nodes(Node).Key = Key);
+            exit;
+         else
+            pragma Assert (Tree.Nodes(Node).Key < Key);
+            pragma Assert (if Tree.Nodes(Node).Right /= 0 then
+                             (not (for some i in Index_Type'Range =>
+                                       (Is_UsedNode(Tree, i) and
+                                              Tree.Nodes(i).Key = Key))));
+            Node := Tree.Nodes(Node).Right;
+         end if;
+         pragma Loop_Invariant (Is_Consistent(Tree) and Key /= Sentinel_Key);
+      end loop;
+      pragma Assert (Is_Consistent(Tree) and Key /= Sentinel_Key);
+      pragma Assert (if Node /= 0 then
+                        Tree.Nodes(Node).Key = Key);
+      return Node;
+   end Find_Node;
+
+   ----------------------------------------------------------------------------
+   function In_Order_NextNode(Tree: in Tree_Type;
+                              Node: in Pointer_Type) return Pointer_Type
+     with
+       Pre => ((Is_Consistent(Tree) and Node /= 0) and then Is_UsedNode (Tree, Node)),
+       Post => (if In_Order_NextNode'Result /= 0 then
+                  (Is_KeyStored(Tree, Tree.Nodes(In_Order_NextNode'Result).Key) and
+                     Tree.Nodes(Node).Key < In_Order_NextNode'Result))
+     is
+      This:   Pointer_Type := Node;
+      Parent: Pointer_Type;
+   begin
+      if Tree.Nodes(This).Right = 0 then
+         Parent := Tree.Nodes(This).Parent;
+         if Parent = 0 then
+            -- end of the traverse
+            return 0;
+         end if;
+         pragma Assert (Parent /= 0);
+         while This = Tree.Nodes(Parent).Right loop
+            pragma Loop_Invariant ((Parent /= 0 and This /= 0) and then
+                                     (Tree.Nodes(This).Key /= Sentinel_Key and
+                                     Tree.Nodes(Parent).Key /= Sentinel_Key));
+            This   := Parent;
+            pragma Assert (This /= 0);
+            Parent := Tree.Nodes(This).Parent;
+            if Parent = 0 then
+               -- end of the traverse
+               return 0;
+            end if;
+            pragma Assert (Parent /= 0);
+         end loop;
+         pragma Assert (Parent /= 0 and This /= 0);
+         pragma Assert (This = Tree.Nodes(Parent).Left or This = Tree.Nodes(Parent).Right);
+         pragma Assert (This = Tree.Nodes(Parent).Left);
+         This := Parent;
+      else
+         This := Tree.Nodes(This).Right;
+         while Tree.Nodes(This).Left /= 0 loop
+            pragma Loop_Invariant (This /= 0 and then Tree.Nodes(This).Left /= 0);
+            This := Tree.Nodes(This).Left;
+         end loop;
+      end if;
+      return This;
+   end In_Order_NextNode;
+
+   ----------------------------------------------------------------------------
+   function In_Order_Next  (Tree: in Tree_Type;
+                            Key:  in Key_Type) return Key_Type is
+      Node: Pointer_Type;
+   begin
+      pragma Assert (Is_KeyStored (Tree, Key));
+      Node := Find_Node (Tree, Key);
+      pragma Assert (Node /= 0);
+      Node := In_Order_NextNode(Tree, Node);
+      If Node = 0 then
+         return Sentinel_Key;
+      else
+         return Tree.Nodes(Node).Key;
+      end if;
+   end In_Order_Next;
+
+   function Find_Key       (Tree: in Tree_Type;
+                            Key:  in Key_Type) return Boolean is
+   begin
+      return Find_Node (Tree, Key) /= 0;
+   end Find_Key;
+
+   function Find_Value     (Tree: in Tree_Type;
+                            Key:  in Key_Type) return Value_Type is
+      Node: Pointer_Type;
+   begin
+      pragma Assert (Find_Key (Tree, Key));
+      Node := Find_Node (Tree, Key);
+      return Tree.Nodes(Node).Value;
+   end Find_Value;
 
 end Trees;
