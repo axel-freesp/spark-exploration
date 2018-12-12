@@ -13,7 +13,8 @@ package Free_Lists is
    procedure Initialize (List: out Free_List_Type)
      with
        Global => null,
-       Post => (Is_Consistent(List));
+       Post => (Is_Consistent(List) and
+                Is_New (List));
 
    procedure Allocate (List: in out Free_List_Type;
                        Pointer: out Pointer_Type)
@@ -35,6 +36,11 @@ package Free_Lists is
        inline,
        Global => null;
 
+   function Is_New  (List: in Free_List_Type) return Boolean
+     with
+       inline,
+       Global => null;
+
    function Is_Consistent  (List: in Free_List_Type) return Boolean
      with
        inline,
@@ -46,7 +52,9 @@ package Free_Lists is
      with
        inline,
        Global => null,
-       Ghost => True;
+       Ghost => True,
+       Pre  => (Is_Consistent (List)),
+       Post => (if Is_New (List) then not Is_Allocated'Result);
 
 private
    type Pointer_Array_Type is array (1 .. Capacity) of Pointer_Type;
@@ -59,17 +67,22 @@ private
    function Is_Empty  (List: in Free_List_Type) return Boolean is
       (List.Top = 0);
 
+   function Is_New  (List: in Free_List_Type) return Boolean is
+     (List.Top = 1
+      and (for all i in 1 .. Capacity - 1 =>
+                     List.Next(i) = i + 1)
+      and List.Next(Capacity) = 0);
+
    function Is_Consistent  (List: in Free_List_Type) return Boolean is
      (for all i in 1 .. Capacity =>
         (if List.Next(i) /= 0 then
-             ((List.Top /= List.Next(i)) and
-              (for all j in 1 .. Capacity =>
-                 (if List.Next(j) /= 0 then
-                      (if i /= j then List.Next(i) /= List.Next(j)))))
-         else
-           (for all j in 1 .. Capacity =>
-                (for all k in 1 .. Capacity =>
-                     (if List.Next(j) = i and List.Next(k) = i then j = k)))));
+             (List.Top /= List.Next(i)
+              and (for all j in 1 .. Capacity =>
+                     (if List.Next(j) /= 0 then
+                          (if i /= j then List.Next(i) /= List.Next(j))))
+              and (for all j in 1 .. Capacity =>
+                     (for all k in 1 .. Capacity =>
+                        (if List.Next(j) = i and List.Next(k) = i then j = k))))));
 
    function Is_Allocated (List: in Free_List_Type;
                           Pointer: in Pointer_Type) return Boolean is

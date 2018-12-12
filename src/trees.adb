@@ -72,8 +72,9 @@ package body Trees is
         (for all i in Index_Type'Range =>
            (if Is_UsedNode(Tree, i) and i /= Node then Is_Allocated (Tree.Free_List, i)))
          with
-           inline,
-           Ghost => True;
+            inline,
+            Ghost => True,
+            Pre =>  (Is_Consistent_Except (Tree, Node));
 
       function Is_Ordered_Except (Tree: in Tree_Type;
                                   Node: in Index_Type) return Boolean is
@@ -87,8 +88,8 @@ package body Trees is
 
       function Is_Consistent_Except (Tree: in Tree_Type;
                                      Node: in Index_Type) return Boolean is
-        (Is_Consistent (Tree.Free_List) and
-         Each_Key_Is_Unique (Tree) and
+        (Is_Consistent (Tree.Free_List) and then
+         (Each_Key_Is_Unique (Tree) and
          Is_Ordered_Except (Tree, Node) and
          Used_Nodes_Cannot_Be_Allocated (Tree) and
          Each_Used_Node_Except_Has_Parent (Tree, Node) and
@@ -99,7 +100,7 @@ package body Trees is
          (if Tree.Root_Node /= 0 then not Is_FreeNode (Tree, Tree.Root_Node)) and
          (for all i in Index_Type'Range =>
               (if Is_UsedNode (Tree, i) and i /= Node then
-                      Is_UsedNodeConsistent (Tree, i))))
+                      Is_UsedNodeConsistent (Tree, i)))))
           with
             inline,
             Ghost => True;

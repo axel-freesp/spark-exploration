@@ -23,6 +23,9 @@ package Trees is
 
 
    type Tree_Type is private;
+   --  with
+   --    Type_Invariant => (Is_Consistent(Tree_Type));
+
    type Tree_Status_Type is (Ok, OutOfMemory);
 
    procedure Initialize (Tree: out Tree_Type)
@@ -96,10 +99,7 @@ private ---------------------------------------------------------
          Root_Node: Pointer_Type;
          Nodes:     Nodes_Type;
          Free_List: Free_List_Type;
-      end record
-   --with
-   --  Type_Invariant => (Is_Consistent(Tree_Type))
-   ;
+      end record;
 
 
    function Is_Empty (Tree: in Tree_Type) return Boolean is
@@ -229,7 +229,8 @@ private ---------------------------------------------------------
         (if Is_UsedNode(Tree, i) then Is_Allocated (Tree.Free_List, i)))
          with
            inline,
-           Ghost => True;
+         Ghost => True,
+         Pre => (Is_Consistent (Tree.Free_List));
 
    function Is_UsedNodeConsistent (Tree: in Tree_Type;
                                    Node: in Index_Type) return Boolean is
@@ -250,8 +251,8 @@ private ---------------------------------------------------------
            Ghost => True;
 
    function Is_Consistent  (Tree: in Tree_Type) return Boolean is
-     (Is_Consistent (Tree.Free_List) and
-      Each_Key_Is_Unique (Tree) and
+     (Is_Consistent (Tree.Free_List) and then
+      (Each_Key_Is_Unique (Tree) and
       Is_Ordered (Tree) and
       Used_Nodes_Cannot_Be_Allocated (Tree) and
       Each_Used_Node_Has_Parent (Tree) and
@@ -262,7 +263,7 @@ private ---------------------------------------------------------
       (if Tree.Root_Node = 0 then Is_Empty (Tree)) and
       (for all i in Index_Type'Range =>
            (if Is_UsedNode (Tree, i) then
-                   Is_UsedNodeConsistent (Tree, i))));
+                   Is_UsedNodeConsistent (Tree, i)))));
 
    function Is_Preserving  (Tree, Old_Tree: in Tree_Type) return Boolean is
      (if not Is_Empty(Old_Tree) then
