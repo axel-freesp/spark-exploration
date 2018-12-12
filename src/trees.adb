@@ -105,6 +105,106 @@ package body Trees is
             inline,
             Ghost => True;
 
+      procedure Lemma_Is_Consistent_Except_FreeListConsistency (Tree: in Tree_Type;
+                                                                Node: in Index_Type)
+        with
+          Ghost => True,
+          Pre =>  (Is_Consistent_Except (Tree, Node)),
+          Post => (Is_Consistent (Tree.Free_List))
+      is
+      begin
+         null;
+      end Lemma_Is_Consistent_Except_FreeListConsistency;
+
+      procedure Lemma_Is_Consistent_Except_Each_Key_Is_Unique (Tree: in Tree_Type;
+                                                               Node: in Index_Type)
+        with
+          Ghost => True,
+          Pre =>  (Is_Consistent_Except (Tree, Node)),
+          Post => (Each_Key_Is_Unique (Tree))
+      is
+      begin
+         null;
+      end Lemma_Is_Consistent_Except_Each_Key_Is_Unique;
+
+      procedure Lemma_Is_Consistent_Except_Is_Ordered_Except (Tree: in Tree_Type;
+                                                              Node: in Index_Type)
+        with
+          Ghost => True,
+          Pre =>  (Is_Consistent_Except (Tree, Node)),
+          Post => (Is_Ordered_Except (Tree, Node))
+      is
+      begin
+         null;
+      end Lemma_Is_Consistent_Except_Is_Ordered_Except;
+
+      procedure Lemma_Is_Consistent_Except_Used_Nodes_Cannot_Be_Allocated (Tree: in Tree_Type;
+                                                                           Node: in Index_Type)
+        with
+          Ghost => True,
+          Pre =>  (Is_Consistent_Except (Tree, Node)),
+          Post => (Used_Nodes_Cannot_Be_Allocated (Tree))
+      is
+      begin
+         null;
+      end Lemma_Is_Consistent_Except_Used_Nodes_Cannot_Be_Allocated;
+
+      procedure Lemma_Is_Consistent_Except_Each_Used_Node_Except_Has_Parent (Tree: in Tree_Type;
+                                                                             Node: in Index_Type)
+        with
+          Ghost => True,
+          Pre =>  (Is_Consistent_Except (Tree, Node)),
+          Post => (Each_Used_Node_Except_Has_Parent (Tree, Node))
+      is
+      begin
+         null;
+      end Lemma_Is_Consistent_Except_Each_Used_Node_Except_Has_Parent;
+
+      procedure Lemma_Is_Consistent_Except_Each_Used_Node_Is_Referenced_At_Most_Once (Tree: in Tree_Type;
+                                                                                      Node: in Index_Type)
+        with
+          Ghost => True,
+          Pre =>  (Is_Consistent_Except (Tree, Node)),
+          Post => (Each_Used_Node_Is_Referenced_At_Most_Once (Tree))
+      is
+      begin
+         null;
+      end Lemma_Is_Consistent_Except_Each_Used_Node_Is_Referenced_At_Most_Once;
+
+      procedure Lemma_Is_Consistent_Except_Node_Is_Not_Referenced (Tree: in Tree_Type;
+                                                                   Node: in Index_Type)
+        with
+          Ghost => True,
+          Pre =>  (Is_Consistent_Except (Tree, Node)),
+          Post => (Node_Is_Not_Referenced (Tree, Node))
+      is
+      begin
+         null;
+      end Lemma_Is_Consistent_Except_Node_Is_Not_Referenced;
+
+      procedure Lemma_Is_Consistent_Except_Used_Nodes_Except_Do_Not_Self_Reference (Tree: in Tree_Type;
+                                                                                    Node: in Index_Type)
+        with
+          Ghost => True,
+          Pre =>  (Is_Consistent_Except (Tree, Node)),
+          Post => (Used_Nodes_Except_Do_Not_Self_Reference (Tree, Node))
+      is
+      begin
+         null;
+      end Lemma_Is_Consistent_Except_Used_Nodes_Except_Do_Not_Self_Reference;
+
+      procedure Lemma_Is_Consistent_Except_Referenced_Nodes_Except_Are_Used (Tree: in Tree_Type;
+                                                                             Node: in Index_Type)
+        with
+          Ghost => True,
+          Pre =>  (Is_Consistent_Except (Tree, Node)),
+          Post => (Referenced_Nodes_Except_Are_Used (Tree, Node))
+      is
+      begin
+         null;
+      end Lemma_Is_Consistent_Except_Referenced_Nodes_Except_Are_Used;
+
+
    procedure Insert_Node (Tree: in out Tree_Type;
                           Node: in     Index_Type)
         with
@@ -121,6 +221,15 @@ package body Trees is
          Parent: Pointer_Type := Tree.Root_Node;
          Old_Tree: Tree_Type := Tree with Ghost => True;
       begin
+         Lemma_Is_Consistent_Except_FreeListConsistency (Tree, Node);
+         Lemma_Is_Consistent_Except_Each_Key_Is_Unique (Tree, Node);
+         Lemma_Is_Consistent_Except_Is_Ordered_Except (Tree, Node);
+         Lemma_Is_Consistent_Except_Used_Nodes_Cannot_Be_Allocated (Tree, Node);
+         Lemma_Is_Consistent_Except_Each_Used_Node_Except_Has_Parent (Tree, Node);
+         Lemma_Is_Consistent_Except_Each_Used_Node_Is_Referenced_At_Most_Once (Tree, Node);
+         Lemma_Is_Consistent_Except_Node_Is_Not_Referenced (Tree, Node);
+         Lemma_Is_Consistent_Except_Used_Nodes_Except_Do_Not_Self_Reference (Tree, Node);
+         Lemma_Is_Consistent_Except_Referenced_Nodes_Except_Are_Used (Tree, Node);
          while TRUE loop
             pragma Loop_Invariant (Parent /= 0);
             pragma Loop_Invariant (Is_UsedNode(Tree, Node));
@@ -132,15 +241,14 @@ package body Trees is
             pragma Loop_Invariant (Tree = Old_Tree);
 
             -- pre-conditions
-            pragma Loop_Invariant (Is_Consistent (Tree.Free_List));
-            pragma Loop_Invariant (Each_Key_Is_Unique (Tree));
-            pragma Loop_Invariant (Is_Ordered_Except (Tree, Node));
-            pragma Loop_Invariant (Used_Nodes_Cannot_Be_Allocated (Tree));
-            pragma Loop_Invariant (Each_Used_Node_Except_Has_Parent (Tree, Node));
-            pragma Loop_Invariant (Each_Used_Node_Is_Referenced_At_Most_Once (Tree));
-            pragma Loop_Invariant (Node_Is_Not_Referenced (Tree, Node));
-            pragma Loop_Invariant (Used_Nodes_Except_Do_Not_Self_Reference (Tree, Node));
-            pragma Loop_Invariant (Referenced_Nodes_Except_Are_Used (Tree, Node));
+            pragma Loop_Invariant (Is_Consistent_Except (Tree, Node));
+            --pragma Loop_Invariant (Is_Ordered_Except (Tree, Node));
+            --pragma Loop_Invariant (Used_Nodes_Cannot_Be_Allocated (Tree));
+            --pragma Loop_Invariant (Each_Used_Node_Except_Has_Parent (Tree, Node));
+            --pragma Loop_Invariant (Each_Used_Node_Is_Referenced_At_Most_Once (Tree));
+            --pragma Loop_Invariant (Node_Is_Not_Referenced (Tree, Node));
+            --pragma Loop_Invariant (Used_Nodes_Except_Do_Not_Self_Reference (Tree, Node));
+            --pragma Loop_Invariant (Referenced_Nodes_Except_Are_Used (Tree, Node));
             pragma Loop_Invariant (if Tree.Root_Node /= 0 then not Is_FreeNode (Tree, Tree.Root_Node));
             pragma Loop_Invariant (for all i in Index_Type'Range =>
                                      (if Is_UsedNode (Tree, i) and i /= Node then
@@ -434,6 +542,47 @@ package body Trees is
       pragma Assert (Is_Preserving (Tree, Old_Tree));
 
    end Insert;
+
+   procedure Lemma_Is_Consistent_FreeListConsistency (Tree: in Tree_Type) is
+   begin
+      null;
+   end Lemma_Is_Consistent_FreeListConsistency;
+
+   procedure Lemma_Is_Consistent_Each_Key_Is_Unique (Tree: in Tree_Type) is
+   begin
+      null;
+   end Lemma_Is_Consistent_Each_Key_Is_Unique;
+
+   procedure Lemma_Is_Consistent_Is_Ordered (Tree: in Tree_Type) is
+   begin
+      null;
+   end Lemma_Is_Consistent_Is_Ordered;
+
+   procedure Lemma_Is_Consistent_Used_Nodes_Cannot_Be_Allocated (Tree: in Tree_Type) is
+   begin
+      null;
+   end Lemma_Is_Consistent_Used_Nodes_Cannot_Be_Allocated;
+
+   procedure Lemma_Is_Consistent_Each_Used_Node_Has_Parent (Tree: in Tree_Type) is
+   begin
+      null;
+   end Lemma_Is_Consistent_Each_Used_Node_Has_Parent;
+
+   procedure Lemma_Is_Consistent_Each_Used_Node_Is_Referenced_At_Most_Once (Tree: in Tree_Type) is
+   begin
+      null;
+   end Lemma_Is_Consistent_Each_Used_Node_Is_Referenced_At_Most_Once;
+
+   procedure Lemma_Is_Consistent_Used_Nodes_Do_Not_Self_Reference (Tree: in Tree_Type) is
+   begin
+      null;
+   end Lemma_Is_Consistent_Used_Nodes_Do_Not_Self_Reference;
+
+   procedure Lemma_Is_Consistent_Referenced_Nodes_Are_Used (Tree: in Tree_Type) is
+   begin
+      null;
+   end Lemma_Is_Consistent_Referenced_Nodes_Are_Used;
+
 
 
 end Trees;

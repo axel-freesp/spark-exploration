@@ -272,4 +272,53 @@ private ---------------------------------------------------------
                   (Is_Stored (Tree, Old_Tree.Nodes(i).Key, Old_Tree.Nodes(i).Value)))));
 
 
+   procedure Lemma_Is_Consistent_FreeListConsistency (Tree: in Tree_Type)
+     with
+       Ghost => True,
+       Pre =>  (Is_Consistent (Tree)),
+       Post => (Is_Consistent (Tree.Free_List));
+
+   procedure Lemma_Is_Consistent_Each_Key_Is_Unique (Tree: in Tree_Type)
+     with
+       Ghost => True,
+       Pre =>  (Is_Consistent (Tree)),
+       Post => (Each_Key_Is_Unique (Tree));
+
+   procedure Lemma_Is_Consistent_Is_Ordered (Tree: in Tree_Type)
+     with
+       Ghost => True,
+       Pre =>  (Is_Consistent (Tree)),
+       Post => (Is_Ordered (Tree));
+
+   procedure Lemma_Is_Consistent_Used_Nodes_Cannot_Be_Allocated (Tree: in Tree_Type)
+     with
+       Ghost => True,
+       Pre =>  (Is_Consistent (Tree)),
+       Post => (Used_Nodes_Cannot_Be_Allocated (Tree));
+
+   procedure Lemma_Is_Consistent_Each_Used_Node_Has_Parent (Tree: in Tree_Type)
+     with
+       Ghost => True,
+       Pre =>  (Is_Consistent (Tree)),
+       Post => (Each_Used_Node_Has_Parent (Tree));
+
+   procedure Lemma_Is_Consistent_Each_Used_Node_Is_Referenced_At_Most_Once (Tree: in Tree_Type)
+     with
+       Ghost => True,
+       Pre =>  (Is_Consistent (Tree)),
+       Post => (Each_Used_Node_Is_Referenced_At_Most_Once (Tree));
+
+   procedure Lemma_Is_Consistent_Used_Nodes_Do_Not_Self_Reference (Tree: in Tree_Type)
+     with
+       Ghost => True,
+       Pre =>  (Is_Consistent (Tree)),
+       Post => (Used_Nodes_Do_Not_Self_Reference (Tree));
+
+   procedure Lemma_Is_Consistent_Referenced_Nodes_Are_Used (Tree: in Tree_Type)
+     with
+       Ghost => True,
+       Pre =>  (Is_Consistent (Tree)),
+       Post => (Referenced_Nodes_Are_Used (Tree));
+
+
 end Trees;
